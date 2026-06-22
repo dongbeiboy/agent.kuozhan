@@ -1,7 +1,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import { AgentLoader } from './agentLoader';
 import { createAgentFile, scanAgentDirectories, AgentDefinition } from './agentFileParser';
+import { AgentTreeProvider, AgentFileNode } from './agentTreeProvider';
 
 /**
  * Register all VS Code commands for the Custom Agent Loader extension.
@@ -9,6 +11,7 @@ import { createAgentFile, scanAgentDirectories, AgentDefinition } from './agentF
 export function registerCommands(
   context: vscode.ExtensionContext,
   agentLoader: AgentLoader,
+  treeProvider?: AgentTreeProvider,
 ): vscode.Disposable[] {
   const disposables: vscode.Disposable[] = [];
 
@@ -16,6 +19,7 @@ export function registerCommands(
   disposables.push(
     vscode.commands.registerCommand('customAgentLoader.refresh', () => {
       const agents = agentLoader.reload();
+      treeProvider?.refresh();
       vscode.window.showInformationMessage(
         `Custom Agent Loader: Reloaded ${agents.length} agent(s).`,
       );
@@ -91,6 +95,7 @@ export function registerCommands(
       if (reload === 'Reload') {
         agentLoader.reload();
       }
+      treeProvider?.refresh();
     }),
   );
 
@@ -134,6 +139,34 @@ export function registerCommands(
       });
 
       quickPick.show();
+    }),
+  );
+
+  // --- Delete Agent ---
+  disposables.push(
+    vscode.commands.registerCommand('customAgentLoader.deleteAgent', async (node: AgentFileNode) => {
+      if (!node || node.kind !== 'file' || !node.isDynamic) {
+        return;
+      }
+
+      const confirm = await vscode.window.showWarningMessage(
+        `Delete agent "${node.agent.name}"?\nThis action cannot be undone.`,
+        { modal: true },
+        'Delete',
+      );
+
+      if (confirm !== 'Delete') {
+        return;
+      }
+
+      try {
+        fs.unlinkSync(node.agent.filePath);
+        agentLoader.reload();
+        treeProvider?.refresh();
+        vscode.window.showInformationMessage(`Agent "${node.agent.name}" deleted.`);
+      } catch (err) {
+        vscode.window.showErrorMessage(`Failed to delete agent: ${err}`);
+      }
     }),
   );
 

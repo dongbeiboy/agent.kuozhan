@@ -2,7 +2,9 @@
 .vscode-test/**
 src/**
 node_modules/**
+scripts/**
 .gitignore
 tsconfig.json
 **/*.ts
 **/tsconfig.json
+.version-backup.json

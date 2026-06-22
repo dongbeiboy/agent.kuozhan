@@ -188,6 +188,44 @@ export function createAgentFile(
 }
 
 /**
+ * Set the disabled state of an agent in its .agent.md frontmatter.
+ * Adds `disabled: true/false` if not present, updates it if it exists.
+ */
+export function setAgentDisabled(filePath: string, disabled: boolean): void {
+  const content = fs.readFileSync(filePath, 'utf-8');
+  const lines = content.split('\n');
+  let inFrontmatter = false;
+  let fmStart = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+
+    if (trimmed === '---') {
+      if (fmStart === -1) {
+        fmStart = i;
+        inFrontmatter = true;
+      } else {
+        break; // reached closing ---
+      }
+      continue;
+    }
+
+    if (inFrontmatter && /^disabled\s*:/i.test(trimmed)) {
+      const indent = lines[i].match(/^\s*/)?.[0] || '';
+      lines[i] = `${indent}disabled: ${disabled}`;
+      fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
+      return;
+    }
+  }
+
+  // Not found — insert after frontmatter start marker
+  if (fmStart >= 0) {
+    lines.splice(fmStart + 1, 0, `disabled: ${disabled}`);
+    fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
+  }
+}
+
+/**
  * Agent file watcher — fires callback when .agent.md files change.
  */
 export function watchAgentDirectories(

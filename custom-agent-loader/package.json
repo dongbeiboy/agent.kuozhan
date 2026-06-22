@@ -12,7 +12,8 @@
     "Chat"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onView:customAgentLoader.agentsView"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -36,8 +37,55 @@
         "command": "customAgentLoader.listAgents",
         "title": "Custom Agent: List All Agents",
         "icon": "$(list-tree)"
+      },
+      {
+        "command": "customAgentLoader.deleteAgent",
+        "title": "Custom Agent: Delete Agent",
+        "icon": "$(trash)"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "customAgentLoader",
+          "title": "Custom Agents",
+          "icon": {
+            "light": "./images/agent.svg",
+            "dark": "./images/agent-dark.svg"
+          }
+        }
+      ]
+    },
+    "views": {
+      "customAgentLoader": [
+        {
+          "type": "tree",
+          "id": "customAgentLoader.agentsView",
+          "name": "Custom Agents"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "customAgentLoader.refresh",
+          "group": "navigation",
+          "when": "view == customAgentLoader.agentsView"
+        },
+        {
+          "command": "customAgentLoader.createNewAgent",
+          "group": "navigation",
+          "when": "view == customAgentLoader.agentsView"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "customAgentLoader.deleteAgent",
+          "group": "inline",
+          "when": "view == customAgentLoader.agentsView && viewItem == agent-dynamic"
+        }
+      ]
+    },
     "chatAgents": [
       {
         "name": "agent-01",
@@ -124,6 +172,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "package": "vsce package",
+    "package:dev": "node scripts/dev-version.cjs",
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
