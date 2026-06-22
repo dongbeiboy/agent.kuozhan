@@ -1,0 +1,135 @@
+{
+  "name": "custom-agent-loader",
+  "displayName": "Custom Agent Loader",
+  "description": "Load custom .agent.md files as chat agents usable by runSubagent",
+  "version": "0.1.0",
+  "publisher": "kuozhan",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Chat"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "customAgentLoader.refresh",
+        "title": "Custom Agent: Refresh Agent List",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "customAgentLoader.openAgentsFolder",
+        "title": "Custom Agent: Open Agents Folder",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "customAgentLoader.createNewAgent",
+        "title": "Custom Agent: Create New Agent",
+        "icon": "$(add)"
+      },
+      {
+        "command": "customAgentLoader.listAgents",
+        "title": "Custom Agent: List All Agents",
+        "icon": "$(list-tree)"
+      }
+    ],
+    "chatAgents": [
+      {
+        "name": "agent-01",
+        "description": "Custom Agent Slot 01 — edit slots/agent-01.agent.md to customize",
+        "icon": "copilot",
+        "systemMessagePath": "./slots/agent-01.agent.md"
+      },
+      {
+        "name": "agent-02",
+        "description": "Custom Agent Slot 02 — edit slots/agent-02.agent.md to customize",
+        "icon": "copilot",
+        "systemMessagePath": "./slots/agent-02.agent.md"
+      },
+      {
+        "name": "agent-03",
+        "description": "Custom Agent Slot 03 — edit slots/agent-03.agent.md to customize",
+        "icon": "copilot",
+        "systemMessagePath": "./slots/agent-03.agent.md"
+      },
+      {
+        "name": "agent-04",
+        "description": "Custom Agent Slot 04 — edit slots/agent-04.agent.md to customize",
+        "icon": "copilot",
+        "systemMessagePath": "./slots/agent-04.agent.md"
+      },
+      {
+        "name": "agent-05",
+        "description": "Custom Agent Slot 05 — edit slots/agent-05.agent.md to customize",
+        "icon": "copilot",
+        "systemMessagePath": "./slots/agent-05.agent.md"
+      },
+      {
+        "name": "agent-06",
+        "description": "Custom Agent Slot 06 — edit slots/agent-06.agent.md to customize",
+        "icon": "copilot",
+        "systemMessagePath": "./slots/agent-06.agent.md"
+      },
+      {
+        "name": "agent-07",
+        "description": "Custom Agent Slot 07 — edit slots/agent-07.agent.md to customize",
+        "icon": "copilot",
+        "systemMessagePath": "./slots/agent-07.agent.md"
+      },
+      {
+        "name": "agent-08",
+        "description": "Custom Agent Slot 08 — edit slots/agent-08.agent.md to customize",
+        "icon": "copilot",
+        "systemMessagePath": "./slots/agent-08.agent.md"
+      },
+      {
+        "name": "agent-09",
+        "description": "Custom Agent Slot 09 — edit slots/agent-09.agent.md to customize",
+        "icon": "copilot",
+        "systemMessagePath": "./slots/agent-09.agent.md"
+      },
+      {
+        "name": "agent-10",
+        "description": "Custom Agent Slot 10 — edit slots/agent-10.agent.md to customize",
+        "icon": "copilot",
+        "systemMessagePath": "./slots/agent-10.agent.md"
+      }
+    ],
+    "configuration": {
+      "title": "Custom Agent Loader",
+      "properties": {
+        "customAgentLoader.agentDirectories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Additional directories (absolute paths) to scan for .agent.md files."
+        },
+        "customAgentLoader.enableDynamicRegistration": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable dynamic chat participant registration (experimental). Turn off to use only static slots."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.100.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.5.0",
+    "@vscode/vsce": "^3.0.0"
+  }
+}
