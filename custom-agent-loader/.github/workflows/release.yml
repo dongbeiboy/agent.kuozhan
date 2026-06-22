@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: custom-agent-loader/package-lock.json
+
+      - name: Install dependencies
+        working-directory: custom-agent-loader
+        run: npm ci
+
+      - name: Compile
+        working-directory: custom-agent-loader
+        run: npm run compile
+
+      - name: Package vsix
+        working-directory: custom-agent-loader
+        run: npx vsce package
+
+      - name: Generate changelog
+        id: changelog
+        shell: bash
+        run: |
+          PREV_TAG=$(git tag --sort=-version:refname | head -n 2 | tail -n 1)
+          if [ -z "$PREV_TAG" ]; then
+            echo "body<<EOF" >> $GITHUB_OUTPUT
+            git log --oneline --no-decorate "${{ github.ref_name }}" | tail -n +2 >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "body<<EOF" >> $GITHUB_OUTPUT
+            git log --oneline --no-decorate "$PREV_TAG..${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: custom-agent-loader/*.vsix
+          body: ${{ steps.changelog.outputs.body }}
