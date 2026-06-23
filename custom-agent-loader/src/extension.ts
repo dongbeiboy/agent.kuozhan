@@ -18,8 +18,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const pkg = require(context.asAbsolutePath('./package.json'));
   const now = new Date();
   const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  statusBar.text = `$(copilot) Agent v${pkg.version} · ${time}`;
-  statusBar.tooltip = `Custom Agent Loader v${pkg.version}\nLoaded at ${now.toLocaleString()}\n${agents.length} dynamic agent(s) · 10 static slots`;
+  statusBar.text = `$(hubot) Agent v${pkg.version} · ${time}`;
+  statusBar.tooltip = `Custom Agent Loader v${pkg.version}\nLoaded at ${now.toLocaleString()}\n11 static slots (agent-01 ~ agent-10 + batch-worker)`;
   statusBar.command = 'customAgentLoader.refresh';
   statusBar.show();
   context.subscriptions.push(statusBar);
@@ -31,7 +31,7 @@ export function activate(context: vscode.ExtensionContext): void {
     showCollapseAll: false,
   });
 
-  // Handle checkbox toggle → update frontmatter + reload + refresh tree
+  // Checkbox toggle — enable/disable agent via frontmatter
   treeView.onDidChangeCheckboxState((evt) => {
     for (const [item, state] of evt.items) {
       if (item.kind !== 'file') continue;
@@ -50,12 +50,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Show initial status
   const outputChannel = vscode.window.createOutputChannel('Custom Agent Loader');
-  outputChannel.appendLine(
-    `Custom Agent Loader activated. Loaded ${agents.length} agent(s) from agents/ directory.`,
-  );
-  outputChannel.appendLine(
-    `Additionally, 10 static slots (agent-01 ~ agent-10) are available via slots/ directory.`,
-  );
+  outputChannel.appendLine('Custom Agent Loader activated.');
+  outputChannel.appendLine('11 static slots (agent-01 ~ agent-10 + batch-worker) from slots/ directory.');
   outputChannel.appendLine('');
   outputChannel.appendLine('Commands:');
   outputChannel.appendLine('  Custom Agent: Refresh Agent List');
@@ -63,13 +59,6 @@ export function activate(context: vscode.ExtensionContext): void {
   outputChannel.appendLine('  Custom Agent: Create New Agent');
   outputChannel.appendLine('  Custom Agent: List All Agents');
   outputChannel.appendLine('');
-
-  if (agents.length === 0) {
-    outputChannel.appendLine(
-      'No agents found in agents/ directory yet. ' +
-        'Use "Custom Agent: Create New Agent" to create one.',
-    );
-  }
 
   console.log(`[Custom Agent Loader] Activated with ${agents.length} agent(s).`);
 }

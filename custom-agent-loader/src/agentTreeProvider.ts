@@ -14,7 +14,6 @@ export interface AgentGroupNode {
 export interface AgentFileNode {
   kind: 'file';
   agent: AgentDefinition;
-  isDynamic: boolean;
 }
 
 export type AgentNode = AgentGroupNode | AgentFileNode;
@@ -41,20 +40,17 @@ export class AgentTreeProvider implements vscode.TreeDataProvider<AgentNode> {
 
     const item = new vscode.TreeItem(element.agent.name, vscode.TreeItemCollapsibleState.None);
     item.description = element.agent.description;
-    item.contextValue = element.isDynamic ? 'agent-dynamic' : 'agent-static';
+    item.contextValue = 'agent-slot';
     item.tooltip = `${element.agent.name}\n${element.agent.description}`;
     item.command = {
       command: 'vscode.open',
       title: 'Open File',
       arguments: [vscode.Uri.file(element.agent.filePath)],
     };
-    item.iconPath = new vscode.ThemeIcon(element.isDynamic ? 'copilot' : 'symbol-constant');
-
-    if (element.isDynamic) {
-      item.checkboxState = element.agent.disabled
-        ? vscode.TreeItemCheckboxState.Unchecked
-        : vscode.TreeItemCheckboxState.Checked;
-    }
+    item.iconPath = new vscode.ThemeIcon('copilot');
+    item.checkboxState = element.agent.disabled
+      ? vscode.TreeItemCheckboxState.Unchecked
+      : vscode.TreeItemCheckboxState.Checked;
 
     return item;
   }
@@ -62,14 +58,13 @@ export class AgentTreeProvider implements vscode.TreeDataProvider<AgentNode> {
   getChildren(element?: AgentNode): AgentNode[] {
     if (!element) {
       return [
-        { kind: 'group', label: 'Dynamic Agents', dirName: 'agents' },
         { kind: 'group', label: 'Static Slots', dirName: 'slots' },
       ];
     }
 
     if (element.kind === 'group') {
       const dir = path.join(this.extensionPath, element.dirName);
-      return this.scanDirectory(dir, element.dirName === 'agents');
+      return this.scanDirectory(dir);
     }
 
     return [];
@@ -77,14 +72,12 @@ export class AgentTreeProvider implements vscode.TreeDataProvider<AgentNode> {
 
   getParent(element: AgentNode): AgentNode | undefined {
     if (element.kind === 'file') {
-      const dirName = element.isDynamic ? 'agents' : 'slots';
-      const label = element.isDynamic ? 'Dynamic Agents' : 'Static Slots';
-      return { kind: 'group', label, dirName };
+      return { kind: 'group', label: 'Static Slots', dirName: 'slots' };
     }
     return undefined;
   }
 
-  private scanDirectory(dir: string, isDynamic: boolean): AgentFileNode[] {
+  private scanDirectory(dir: string): AgentFileNode[] {
     if (!fs.existsSync(dir)) {
       return [];
     }
@@ -99,7 +92,7 @@ export class AgentTreeProvider implements vscode.TreeDataProvider<AgentNode> {
           if (!agent) {
             return null;
           }
-          return { kind: 'file', agent, isDynamic };
+          return { kind: 'file', agent };
         })
         .filter((n): n is AgentFileNode => n !== null);
     } catch {

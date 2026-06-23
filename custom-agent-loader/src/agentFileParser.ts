@@ -160,6 +160,122 @@ export function scanAgentDirectories(directories: string[]): AgentDefinition[] {
 }
 
 /**
+ * Collect all existing agent names across the given directories.
+ * (Excludes disabled agents.)
+ */
+export function collectAgentNames(directories: string[]): Set<string> {
+  const names = new Set<string>();
+  for (const dir of directories) {
+    if (!fs.existsSync(dir)) continue;
+    try {
+      for (const entry of fs.readdirSync(dir)) {
+        if (!entry.endsWith('.agent.md')) continue;
+        const agent = parseAgentFile(path.join(dir, entry));
+        if (agent) {
+          names.add(agent.name);
+        }
+      }
+    } catch { /* skip unreadable */ }
+  }
+  return names;
+}
+
+/**
+ * Rewrite the `name` field in an .agent.md file's frontmatter.
+ * Used to auto-rename slot agents when name conflicts are detected.
+ */
+export function renameAgentName(filePath: string, newName: string): boolean {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const lines = content.split('\n');
+    let inFrontmatter = false;
+    let changed = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+      if (trimmed === '---') {
+        inFrontmatter = !inFrontmatter;
+        continue;
+      }
+      if (inFrontmatter && /^name\s*:/i.test(trimmed)) {
+        const indent = lines[i].match(/^\s*/)?.[0] || '';
+        lines[i] = `${indent}name: ${newName}`;
+        changed = true;
+        break;
+      }
+    }
+    if (changed) {
+      fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
+    }
+    return changed;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Detect name conflicts between slot agents and user agents.
+ * Any slot whose name matches a user agent's name gets auto-renamed
+ * to `cal-<name>` in its frontmatter.
+ *
+ * Returns the set of names that were changed.
+ */
+export function resolveSlotConflicts(
+  directories: string[],
+  slotsDir: string,
+): Set<string> {
+  const renamed = new Set<string>();
+
+  // 1. Collect names from non-slot directories (user agents)
+  const userNames = new Set<string>();
+  for (const dir of directories) {
+    if (dir === slotsDir) continue;
+    if (!fs.existsSync(dir)) continue;
+    try {
+      for (const entry of fs.readdirSync(dir)) {
+        if (!entry.endsWith('.agent.md')) continue;
+        const agent = parseAgentFile(path.join(dir, entry));
+        if (agent && !agent.disabled) {
+          userNames.add(agent.name);
+        }
+      }
+    } catch { /* skip */ }
+  }
+
+  // 2. Check slot agents for conflicts
+  if (!fs.existsSync(slotsDir)) return renamed;
+
+  try {
+    for (const entry of fs.readdirSync(slotsDir)) {
+      if (!entry.endsWith('.agent.md')) continue;
+      const filePath = path.join(slotsDir, entry);
+      const agent = parseAgentFile(filePath);
+      if (!agent || agent.disabled) continue;
+
+      if (userNames.has(agent.name)) {
+        const calName = `cal-${agent.name}`;
+
+        // If even cal-name conflicts (e.g. user also has cal-batch-worker),
+        // append a counter suffix
+        let finalName = calName;
+        let counter = 2;
+        while (userNames.has(finalName) || renamed.has(finalName)) {
+          finalName = `cal-${agent.name}-${counter}`;
+          counter++;
+        }
+
+        if (renameAgentName(filePath, finalName)) {
+          renamed.add(finalName);
+          console.log(`[Custom Agent Loader] Slot renamed: ${agent.name} → ${finalName} (name conflict)`);
+        }
+      }
+    }
+  } catch { /* skip */ }
+
+  return renamed;
+}
+
+/**
  * Create a new .agent.md file from a template.
  */
 export function createAgentFile(

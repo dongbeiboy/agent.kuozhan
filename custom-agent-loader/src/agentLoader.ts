@@ -1,18 +1,18 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { AgentDefinition, scanAgentDirectories, watchAgentDirectories } from './agentFileParser';
+import { AgentDefinition, scanAgentDirectories, watchAgentDirectories, resolveSlotConflicts } from './agentFileParser';
 
 /**
- * Manages the lifecycle of custom agents:
- * - Scan configured directories for .agent.md files
- * - Dynamically register as chat participants (plan A)
- * - Track registry state
+ * Manages scanning and watching of agent file directories.
+ *
+ * NOTE: Agent registration is handled statically via package.json
+ * `contributes.chatAgents`. This class only manages file-level
+ * operations (scanning, watching, tree view data).
  */
 export class AgentLoader {
   private context: vscode.ExtensionContext;
   private outputChannel: vscode.OutputChannel;
-  private registeredParticipants: vscode.Disposable[] = [];
   private fileWatchers: vscode.Disposable[] = [];
 
   constructor(context: vscode.ExtensionContext) {
@@ -21,21 +21,24 @@ export class AgentLoader {
   }
 
   /**
-   * Initial load: scan and register all agents.
+   * Initial load: scan all configured directories.
    */
   load(): AgentDefinition[] {
     const directories = this.getAgentDirectories();
+    const slotsDir = path.join(this.context.extensionPath, 'slots');
+
+    // Auto-rename slot agents whose name conflicts with user agents
+    const renamed = resolveSlotConflicts(directories, slotsDir);
+    if (renamed.size > 0) {
+      this.log(`Name conflict resolved: ${[...renamed].join(', ')}`);
+    }
+
     const agents = scanAgentDirectories(directories);
 
     this.log(`Scanned ${directories.length} directories, found ${agents.length} agents`);
 
     for (const agent of agents) {
       this.log(`  → ${agent.name}: ${agent.description}`);
-    }
-
-    // Plan A: dynamic registration
-    if (this.isDynamicRegistrationEnabled()) {
-      this.registerDynamicParticipants(agents);
     }
 
     // Set up file watchers for auto-reload
@@ -50,27 +53,22 @@ export class AgentLoader {
   }
 
   /**
-   * Reload all agents: dispose old participants, re-scan, re-register.
+   * Reload: re-scan directories.
    */
   reload(): AgentDefinition[] {
-    this.unregisterAll();
-    return this.load();
-  }
-
-  /**
-   * Dispose all registered participants.
-   */
-  unregisterAll(): void {
-    for (const d of this.registeredParticipants) {
-      d.dispose();
+    // Dispose old watchers
+    for (const w of this.fileWatchers) {
+      w.dispose();
     }
-    this.registeredParticipants = [];
+    this.fileWatchers = [];
+    return this.load();
   }
 
   /**
    * Get the agent directories to scan:
    * 1. Extension's own agents/ directory
-   * 2. User-configured additional directories
+   * 2. slots/ directory
+   * 3. User-configured additional directories
    */
   getAgentDirectories(): string[] {
     const dirs: string[] = [];
@@ -78,6 +76,10 @@ export class AgentLoader {
     // Built-in agents/ directory
     const builtinDir = path.join(this.context.extensionPath, 'agents');
     dirs.push(builtinDir);
+
+    // Built-in slots/ directory
+    const slotsDir = path.join(this.context.extensionPath, 'slots');
+    dirs.push(slotsDir);
 
     // User-configured directories
     const config = vscode.workspace.getConfiguration('customAgentLoader');
@@ -91,57 +93,11 @@ export class AgentLoader {
     return dirs;
   }
 
-  isDynamicRegistrationEnabled(): boolean {
-    const config = vscode.workspace.getConfiguration('customAgentLoader');
-    return config.get<boolean>('enableDynamicRegistration') !== false;
-  }
-
-  /**
-   * Plan A: Register agents as dynamic chat participants via
-   * vscode.chat.createChatParticipant (if API is available).
-   *
-   * NOTE: This is experimental. It's unclear whether dynamically
-   * registered participants are visible to runSubagent.
-   */
-  private registerDynamicParticipants(agents: AgentDefinition[]): void {
-    if (typeof (vscode.chat as any)?.createChatParticipant !== 'function') {
-      this.log('vscode.chat.createChatParticipant not available — skipping dynamic registration');
-      return;
-    }
-
-    for (const agent of agents) {
-      try {
-        const participant = (vscode.chat as any).createChatParticipant(
-          agent.name,
-          async (
-            request: vscode.ChatRequest,
-            chatCtx: vscode.ChatContext,
-            stream: vscode.ChatResponseStream,
-            token: vscode.CancellationToken,
-          ) => {
-            // The body of the .agent.md serves as the system prompt.
-            // The actual LLM call is handled by VS Code / Copilot when this
-            // participant is invoked through the chat UI or runSubagent.
-            stream.markdown(agent.body);
-          },
-        );
-
-        participant.description = agent.description;
-        participant.iconPath = new vscode.ThemeIcon('copilot');
-
-        this.registeredParticipants.push(participant);
-        this.log(`Dynamically registered participant: ${agent.name}`);
-      } catch (err) {
-        this.log(`Failed to register participant ${agent.name}: ${err}`);
-      }
-    }
-  }
-
   dispose(): void {
-    this.unregisterAll();
     for (const w of this.fileWatchers) {
       w.dispose();
     }
+    this.fileWatchers = [];
     this.outputChannel.dispose();
   }
 

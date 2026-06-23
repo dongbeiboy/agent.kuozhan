@@ -1,8 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as fs from 'fs';
 import { AgentLoader } from './agentLoader';
-import { createAgentFile, scanAgentDirectories, AgentDefinition } from './agentFileParser';
+import { createAgentFile, scanAgentDirectories, setAgentDisabled, collectAgentNames, AgentDefinition } from './agentFileParser';
 import { AgentTreeProvider, AgentFileNode } from './agentTreeProvider';
 
 /**
@@ -37,6 +36,10 @@ export function registerCommands(
   // --- Create New Agent ---
   disposables.push(
     vscode.commands.registerCommand('customAgentLoader.createNewAgent', async () => {
+      // Collect existing agent names for conflict check
+      const agentDirs = agentLoader.getAgentDirectories();
+      const existingNames = collectAgentNames(agentDirs);
+
       const name = await vscode.window.showInputBox({
         prompt: 'Agent name (used as filename and display name)',
         placeHolder: 'my-agent',
@@ -46,6 +49,9 @@ export function registerCommands(
           }
           if (/[<>:"/\\|?*]/.test(value)) {
             return 'Name contains invalid characters';
+          }
+          if (existingNames.has(value.trim())) {
+            return `Name "${value.trim()}" already exists in agents/ or slots/`;
           }
           return null;
         },
@@ -145,27 +151,27 @@ export function registerCommands(
   // --- Delete Agent ---
   disposables.push(
     vscode.commands.registerCommand('customAgentLoader.deleteAgent', async (node: AgentFileNode) => {
-      if (!node || node.kind !== 'file' || !node.isDynamic) {
+      if (!node || node.kind !== 'file') {
         return;
       }
 
       const confirm = await vscode.window.showWarningMessage(
-        `Delete agent "${node.agent.name}"?\nThis action cannot be undone.`,
+        `Disable agent "${node.agent.name}"?\nYou can re-enable it via checkbox.`,
         { modal: true },
-        'Delete',
+        'Disable',
       );
 
-      if (confirm !== 'Delete') {
+      if (confirm !== 'Disable') {
         return;
       }
 
       try {
-        fs.unlinkSync(node.agent.filePath);
+        setAgentDisabled(node.agent.filePath, true);
         agentLoader.reload();
         treeProvider?.refresh();
-        vscode.window.showInformationMessage(`Agent "${node.agent.name}" deleted.`);
+        vscode.window.showInformationMessage(`Agent "${node.agent.name}" disabled.`);
       } catch (err) {
-        vscode.window.showErrorMessage(`Failed to delete agent: ${err}`);
+        vscode.window.showErrorMessage(`Failed to disable agent: ${err}`);
       }
     }),
   );
