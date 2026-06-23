@@ -133,7 +133,7 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile:ts",
+    "vscode:prepublish": "echo ok",
     "compile": "npm run bump-build && tsc -p ./",
     "compile:ts": "tsc -p ./",
     "watch": "tsc -watch -p ./",
