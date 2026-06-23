@@ -6,14 +6,15 @@ A VS Code extension that lets you create and manage custom `.agent.md` files as 
 
 ### Plan B: Static Slots (primary, verified)
 
-The extension registers 10 static agent slots (`agent-01` ~ `agent-10`) in `package.json`. Each slot points to a file in the `slots/` directory. Edit the `.agent.md` file, reload VS Code, and your custom agent is live.
+The extension registers 11 static agent slots (`agent-01` ~ `agent-10` + `batch-worker`) in `package.json`. Each slot points to a file in the `slots/` directory. Edit the `.agent.md` file, reload VS Code, and your custom agent is live.
 
 ```
 slots/
 ├── agent-01.agent.md  ← edit this
 ├── agent-02.agent.md  ← edit this
 ...
-└── agent-10.agent.md  ← edit this
+├── agent-10.agent.md  ← edit this
+└── batch-worker.agent.md  ← batch processing agent
 ```
 
 After editing, run **Developer: Reload Window** to apply changes.
@@ -29,16 +30,33 @@ The extension also scans the `agents/` directory for `.agent.md` files and attem
 "customAgentLoader.enableDynamicRegistration": false // disabled, static slots only
 ```
 
+### Tree View
+
+The extension adds a **Custom Agents** view in the activity bar for browsing, refreshing, creating, and deleting agents.
+
+### Additional Scan Directories
+
+You can configure extra directories to scan for `.agent.md` files:
+
+```json
+"customAgentLoader.agentDirectories": [
+  "/path/to/your/agents"
+]
+```
+
 ## Usage
 
 ### Commands
 
 | Command | Description |
 |---|---|
+| Command | Description |
+|---|---|
 | `Custom Agent: Refresh Agent List` | Re-scan agent directories |
 | `Custom Agent: Open Agents Folder` | Open the `agents/` directory |
 | `Custom Agent: Create New Agent` | Interactive wizard to create a new `.agent.md` |
 | `Custom Agent: List All Agents` | Quick pick list to browse/edit agents |
+| `Custom Agent: Delete Agent` | Delete the selected agent file |
 
 ### Agent file format
 
@@ -65,6 +83,8 @@ runSubagent("agent-01", {
 
 ```bash
 npm install
-npm run compile
-npm run package   # generates .vsix
+npm run compile      # compile (with build number bump)
+npm run compile:ts   # TypeScript only compilation
+npm run package      # generate .vsix
+npm run package:dev  # generate dev .vsix (appends -dev suffix)
 ```
