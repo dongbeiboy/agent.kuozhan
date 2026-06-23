@@ -14,6 +14,8 @@ export interface AgentGroupNode {
 export interface AgentFileNode {
   kind: 'file';
   agent: AgentDefinition;
+  /** Whether the agent is in a static directory (cannot be disabled) */
+  isStatic: boolean;
 }
 
 export type AgentNode = AgentGroupNode | AgentFileNode;
@@ -24,7 +26,15 @@ export class AgentTreeProvider implements vscode.TreeDataProvider<AgentNode> {
   private _onDidChangeTreeData = new vscode.EventEmitter<AgentNode | undefined>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-  constructor(private extensionPath: string) {}
+  constructor(
+    private extensionPath: string,
+    private staticFiles: Set<string>,
+  ) {}
+
+  /** Update the set of static file paths (called after reload) */
+  setStaticFiles(files: Set<string>): void {
+    this.staticFiles = files;
+  }
 
   refresh(): void {
     this._onDidChangeTreeData.fire(undefined);
@@ -40,26 +50,49 @@ export class AgentTreeProvider implements vscode.TreeDataProvider<AgentNode> {
 
     const item = new vscode.TreeItem(element.agent.name, vscode.TreeItemCollapsibleState.None);
     item.description = element.agent.description;
-    item.contextValue = 'agent-slot';
-    item.tooltip = `${element.agent.name}\n${element.agent.description}`;
+    item.contextValue = element.isStatic ? 'agent-static' : 'agent-slot';
+    item.tooltip = element.isStatic
+      ? `${element.agent.name} (static, cannot be disabled)\n${element.agent.description}`
+      : `${element.agent.name}\n${element.agent.description}`;
     item.command = {
       command: 'vscode.open',
       title: 'Open File',
       arguments: [vscode.Uri.file(element.agent.filePath)],
     };
-    item.iconPath = new vscode.ThemeIcon('copilot');
-    item.checkboxState = element.agent.disabled
-      ? vscode.TreeItemCheckboxState.Unchecked
-      : vscode.TreeItemCheckboxState.Checked;
+    item.iconPath = element.isStatic
+      ? new vscode.ThemeIcon('lock')
+      : new vscode.ThemeIcon('copilot');
+
+    // Static agents don't get checkboxes
+    if (!element.isStatic) {
+      item.checkboxState = element.agent.disabled
+        ? vscode.TreeItemCheckboxState.Unchecked
+        : vscode.TreeItemCheckboxState.Checked;
+    }
 
     return item;
   }
 
   getChildren(element?: AgentNode): AgentNode[] {
     if (!element) {
-      return [
-        { kind: 'group', label: 'Static Slots', dirName: 'slots' },
-      ];
+      const groups: AgentNode[] = [];
+
+      const staticSlotsDir = path.join(this.extensionPath, 'static-slots');
+      if (fs.existsSync(staticSlotsDir)) {
+        groups.push({ kind: 'group', label: 'Static Slots', dirName: 'static-slots' });
+      }
+
+      const slotsDir = path.join(this.extensionPath, 'slots');
+      if (fs.existsSync(slotsDir)) {
+        groups.push({ kind: 'group', label: 'Dynamic Slots', dirName: 'slots' });
+      }
+
+      const agentsDir = path.join(this.extensionPath, 'agents');
+      if (fs.existsSync(agentsDir)) {
+        groups.push({ kind: 'group', label: 'Custom Agents', dirName: 'agents' });
+      }
+
+      return groups;
     }
 
     if (element.kind === 'group') {
@@ -72,7 +105,13 @@ export class AgentTreeProvider implements vscode.TreeDataProvider<AgentNode> {
 
   getParent(element: AgentNode): AgentNode | undefined {
     if (element.kind === 'file') {
-      return { kind: 'group', label: 'Static Slots', dirName: 'slots' };
+      const parentDir = path.dirname(element.agent.filePath);
+      const dirName = path.basename(parentDir);
+      const label =
+        dirName === 'static-slots' ? 'Static Slots' :
+        dirName === 'slots' ? 'Dynamic Slots' :
+        'Custom Agents';
+      return { kind: 'group', label, dirName };
     }
     return undefined;
   }
@@ -92,7 +131,11 @@ export class AgentTreeProvider implements vscode.TreeDataProvider<AgentNode> {
           if (!agent) {
             return null;
           }
-          return { kind: 'file', agent };
+          return {
+            kind: 'file',
+            agent,
+            isStatic: this.staticFiles.has(filePath),
+          };
         })
         .filter((n): n is AgentFileNode => n !== null);
     } catch {

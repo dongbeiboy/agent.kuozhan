@@ -16,7 +16,8 @@ const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
 const originalVersion = pkg.version;
 fs.writeFileSync(backupPath, JSON.stringify({ version: originalVersion }), 'utf-8');
 
-const base = originalVersion.replace(/-.*$/, '');
+const base = originalVersion.replace(/-.*$/, '').split('.').slice(0, 3).join('.');
+const localPatch = pkg._patch !== undefined ? pkg._patch : 0;
 const now = new Date();
 const y = now.getFullYear();
 const M = String(now.getMonth() + 1).padStart(2, '0');
@@ -31,7 +32,7 @@ try {
   commitCount = execSync('git rev-list --count HEAD', { encoding: 'utf-8' }).trim();
 } catch { /* not a git repo */ }
 
-const devVersion = `${base}-dev.${dateStr}.${commitCount}`;
+const devVersion = `${base}-dev.${localPatch}.${dateStr}`;
 pkg.version = devVersion;
 fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
 console.log(`Dev version set: ${devVersion}`);

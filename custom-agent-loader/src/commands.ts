@@ -3,6 +3,7 @@ import * as path from 'path';
 import { AgentLoader } from './agentLoader';
 import { createAgentFile, scanAgentDirectories, setAgentDisabled, collectAgentNames, AgentDefinition } from './agentFileParser';
 import { AgentTreeProvider, AgentFileNode } from './agentTreeProvider';
+import { ChatParticipantManager } from './chatParticipantManager';
 
 /**
  * Register all VS Code commands for the Custom Agent Loader extension.
@@ -11,6 +12,7 @@ export function registerCommands(
   context: vscode.ExtensionContext,
   agentLoader: AgentLoader,
   treeProvider?: AgentTreeProvider,
+  participantManager?: ChatParticipantManager,
 ): vscode.Disposable[] {
   const disposables: vscode.Disposable[] = [];
 
@@ -18,9 +20,12 @@ export function registerCommands(
   disposables.push(
     vscode.commands.registerCommand('customAgentLoader.refresh', () => {
       const agents = agentLoader.reload();
+      participantManager?.setStaticFiles(agentLoader.staticFiles);
+      treeProvider?.setStaticFiles(agentLoader.staticFiles);
+      participantManager?.reconcile(agents, context.extensionUri);
       treeProvider?.refresh();
       vscode.window.showInformationMessage(
-        `Custom Agent Loader: Reloaded ${agents.length} agent(s).`,
+        `Custom Agent Loader: Reloaded ${agents.length} agent(s), ${participantManager?.size ?? 0} active.`,
       );
     }),
   );
@@ -99,7 +104,10 @@ export function registerCommands(
       );
 
       if (reload === 'Reload') {
-        agentLoader.reload();
+        const agents2 = agentLoader.reload();
+        participantManager?.setStaticFiles(agentLoader.staticFiles);
+        treeProvider?.setStaticFiles(agentLoader.staticFiles);
+        participantManager?.reconcile(agents2, context.extensionUri);
       }
       treeProvider?.refresh();
     }),
@@ -109,7 +117,9 @@ export function registerCommands(
   disposables.push(
     vscode.commands.registerCommand('customAgentLoader.listAgents', () => {
       const directories = agentLoader.getAgentDirectories();
-      const agents = scanAgentDirectories(directories);
+      const staticDirs = agentLoader.getStaticDirectoryNames();
+      const result = scanAgentDirectories(directories, staticDirs);
+      const agents = result.agents;
 
       if (agents.length === 0) {
         vscode.window.showInformationMessage(
@@ -148,10 +158,18 @@ export function registerCommands(
     }),
   );
 
-  // --- Delete Agent ---
+  // --- Disable Agent ---
   disposables.push(
-    vscode.commands.registerCommand('customAgentLoader.deleteAgent', async (node: AgentFileNode) => {
+    vscode.commands.registerCommand('customAgentLoader.disableAgent', async (node: AgentFileNode) => {
       if (!node || node.kind !== 'file') {
+        return;
+      }
+
+      // Static agents cannot be disabled
+      if (participantManager?.isStaticFile(node.agent.filePath)) {
+        vscode.window.showInformationMessage(
+          `"${node.agent.name}" is a static agent and cannot be disabled.`,
+        );
         return;
       }
 
@@ -167,7 +185,10 @@ export function registerCommands(
 
       try {
         setAgentDisabled(node.agent.filePath, true);
-        agentLoader.reload();
+        const agents2 = agentLoader.reload();
+        participantManager?.setStaticFiles(agentLoader.staticFiles);
+        treeProvider?.setStaticFiles(agentLoader.staticFiles);
+        participantManager?.reconcile(agents2, context.extensionUri);
         treeProvider?.refresh();
         vscode.window.showInformationMessage(`Agent "${node.agent.name}" disabled.`);
       } catch (err) {

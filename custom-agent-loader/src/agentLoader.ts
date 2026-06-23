@@ -1,23 +1,29 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { AgentDefinition, scanAgentDirectories, watchAgentDirectories, resolveSlotConflicts } from './agentFileParser';
+import { AgentDefinition, ScanResult, scanAgentDirectories, watchAgentDirectories, resolveSlotConflicts } from './agentFileParser';
 
 /**
  * Manages scanning and watching of agent file directories.
  *
- * NOTE: Agent registration is handled statically via package.json
- * `contributes.chatAgents`. This class only manages file-level
+ * Agent registration is handled dynamically via ChatParticipantManager
+ * (createChatParticipant). This class only manages file-level
  * operations (scanning, watching, tree view data).
  */
 export class AgentLoader {
   private context: vscode.ExtensionContext;
   private outputChannel: vscode.OutputChannel;
   private fileWatchers: vscode.Disposable[] = [];
+  private _staticFiles: Set<string> = new Set();
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
     this.outputChannel = vscode.window.createOutputChannel('Custom Agent Loader');
+  }
+
+  /** The set of agent file paths that belong to static directories */
+  get staticFiles(): Set<string> {
+    return this._staticFiles;
   }
 
   /**
@@ -25,6 +31,7 @@ export class AgentLoader {
    */
   load(): AgentDefinition[] {
     const directories = this.getAgentDirectories();
+    const staticDirs = this.getStaticDirectoryNames();
     const slotsDir = path.join(this.context.extensionPath, 'slots');
 
     // Auto-rename slot agents whose name conflicts with user agents
@@ -33,11 +40,12 @@ export class AgentLoader {
       this.log(`Name conflict resolved: ${[...renamed].join(', ')}`);
     }
 
-    const agents = scanAgentDirectories(directories);
+    const result = scanAgentDirectories(directories, staticDirs);
+    this._staticFiles = result.staticFiles;
 
-    this.log(`Scanned ${directories.length} directories, found ${agents.length} agents`);
+    this.log(`Scanned ${directories.length} directories, found ${result.agents.length} agents`);
 
-    for (const agent of agents) {
+    for (const agent of result.agents) {
       this.log(`  → ${agent.name}: ${agent.description}`);
     }
 
@@ -49,7 +57,7 @@ export class AgentLoader {
 
     this.context.subscriptions.push(...this.fileWatchers);
 
-    return agents;
+    return result.agents;
   }
 
   /**
@@ -66,20 +74,25 @@ export class AgentLoader {
 
   /**
    * Get the agent directories to scan:
-   * 1. Extension's own agents/ directory
-   * 2. slots/ directory
-   * 3. User-configured additional directories
+   * 1. static-slots/ (static, declared in package.json)
+   * 2. slots/ (dynamic, toggle-able)
+   * 3. agents/ (user-created, dynamic, toggle-able)
+   * 4. User-configured additional directories
    */
   getAgentDirectories(): string[] {
     const dirs: string[] = [];
 
-    // Built-in agents/ directory
-    const builtinDir = path.join(this.context.extensionPath, 'agents');
-    dirs.push(builtinDir);
+    // Static slots directory
+    const staticSlotsDir = path.join(this.context.extensionPath, 'static-slots');
+    dirs.push(staticSlotsDir);
 
-    // Built-in slots/ directory
+    // Dynamic slots directory
     const slotsDir = path.join(this.context.extensionPath, 'slots');
     dirs.push(slotsDir);
+
+    // User agents directory
+    const agentsDir = path.join(this.context.extensionPath, 'agents');
+    dirs.push(agentsDir);
 
     // User-configured directories
     const config = vscode.workspace.getConfiguration('customAgentLoader');
@@ -91,6 +104,14 @@ export class AgentLoader {
     }
 
     return dirs;
+  }
+
+  /**
+   * Get the list of static directory names (relative to extension root).
+   */
+  getStaticDirectoryNames(): string[] {
+    const config = vscode.workspace.getConfiguration('customAgentLoader');
+    return config.get<string[]>('staticDirectories') || ['static-slots'];
   }
 
   dispose(): void {

@@ -1,12 +1,12 @@
 /**
- * Auto-increment build number on each compile.
+ * Auto-increment _patch counter on each compile.
  *
- * Version format: MAJOR.MINOR.PATCH.BUILD
- * - Each build increments BUILD by 1 (i.e., +0.0.0.1)
- * - When MAJOR changes, BUILD resets to 0 (starts counting from 0.0.0.0 again)
+ * - _patch lives in package.json, independent of the CI-managed `version`
+ * - Each compile increments _patch by 1
+ * - When MAJOR or MINOR in `version` changes, _patch resets to 1
  *
- * The previous base version (MAJOR.MINOR.PATCH) is tracked via _baseVersion
- * in package.json to detect major version changes.
+ * The previous MAJOR.MINOR is tracked via _baseVersion in package.json
+ * to detect version resets.
  */
 const fs = require('fs');
 const path = require('path');
@@ -22,22 +22,23 @@ const parts = cleanVersion.split('.').map(Number);
 
 const major = parts[0];
 const minor = parts[1] || 0;
-const patch = parts[2] || 0;
-let build = parts[3] !== undefined ? parts[3] : 0;
 
-const currentBase = `${major}.${minor}.${patch}`;
+const currentBase = `${major}.${minor}`;
 const storedBase = pkg._baseVersion || '';
 
+let patch = pkg._patch !== undefined ? pkg._patch : 0;
+
 if (currentBase !== storedBase) {
-  // Base version (particularly major) changed → reset build counter
-  build = 0;
+  // MAJOR or MINOR changed → reset patch to 1
+  patch = 1;
   pkg._baseVersion = currentBase;
-  console.log(`Base version changed: ${storedBase || '(none)'} → ${currentBase}, build reset to 0`);
+  console.log(`Base version changed: ${storedBase || '(none)'} → ${currentBase}, _patch reset to 1`);
+} else {
+  // Increment patch
+  patch++;
 }
 
-// Increment build number
-build++;
-pkg.version = `${currentBase}.${build}`;
+pkg._patch = patch;
 
 fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
-console.log(`Version bumped to: ${pkg.version}`);
+console.log(`_patch bumped to: ${patch}`);

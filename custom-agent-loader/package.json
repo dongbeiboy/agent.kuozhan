@@ -2,7 +2,7 @@
   "name": "custom-agent-loader",
   "displayName": "Custom Agent Loader",
   "description": "Load custom .agent.md files as chat agents usable by runSubagent",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "publisher": "kuozhan",
   "license": "MIT",
   "repository": {
@@ -43,9 +43,9 @@
         "icon": "$(list-tree)"
       },
       {
-        "command": "customAgentLoader.deleteAgent",
-        "title": "Custom Agent: Delete Agent",
-        "icon": "$(trash)"
+        "command": "customAgentLoader.disableAgent",
+        "title": "Custom Agent: Disable Agent",
+        "icon": "$(circle-slash)"
       }
     ],
     "viewsContainers": {
@@ -81,7 +81,7 @@
       ],
       "view/item/context": [
         {
-          "command": "customAgentLoader.deleteAgent",
+          "command": "customAgentLoader.disableAgent",
           "group": "inline",
           "when": "view == customAgentLoader.agentsView && viewItem == agent-slot"
         }
@@ -89,37 +89,7 @@
     },
     "chatAgents": [
       {
-        "path": "./slots/agent-01.agent.md"
-      },
-      {
-        "path": "./slots/agent-02.agent.md"
-      },
-      {
-        "path": "./slots/agent-03.agent.md"
-      },
-      {
-        "path": "./slots/agent-04.agent.md"
-      },
-      {
-        "path": "./slots/agent-05.agent.md"
-      },
-      {
-        "path": "./slots/agent-06.agent.md"
-      },
-      {
-        "path": "./slots/agent-07.agent.md"
-      },
-      {
-        "path": "./slots/agent-08.agent.md"
-      },
-      {
-        "path": "./slots/agent-09.agent.md"
-      },
-      {
-        "path": "./slots/agent-10.agent.md"
-      },
-      {
-        "path": "./slots/batch-worker.agent.md"
+        "path": "./static-slots/batch-worker.agent.md"
       }
     ],
     "configuration": {
@@ -132,6 +102,16 @@
           },
           "default": [],
           "description": "Additional directories (absolute paths) to scan for .agent.md files."
+        },
+        "customAgentLoader.staticDirectories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "static-slots"
+          ],
+          "description": "Directories (relative to extension root) whose agents are statically declared in package.json chatAgents and CANNOT be disabled."
         }
       }
     }
@@ -146,7 +126,8 @@
     "bump-build": "node scripts/bump-build.cjs",
     "lint": "eslint src --ext ts"
   },
-  "_baseVersion": "0.1.0",
+  "_patch": 8,
+  "_baseVersion": "0.1",
   "devDependencies": {
     "@types/vscode": "^1.100.0",
     "@types/node": "^20.0.0",

@@ -124,14 +124,23 @@ export function parseAgentFile(filePath: string): AgentDefinition | null {
 /**
  * Scans directories for .agent.md files and returns parsed definitions.
  */
-export function scanAgentDirectories(directories: string[]): AgentDefinition[] {
+export interface ScanResult {
+  agents: AgentDefinition[];
+  /** Absolute paths of agent files that belong to a static directory */
+  staticFiles: Set<string>;
+}
+
+export function scanAgentDirectories(directories: string[], staticDirs: string[]): ScanResult {
   const agents: AgentDefinition[] = [];
+  const staticFiles = new Set<string>();
   const seen = new Set<string>();
 
   for (const dir of directories) {
     if (!fs.existsSync(dir)) {
       continue;
     }
+
+    const isStatic = staticDirs.some(s => dir.endsWith(s) || dir.endsWith(path.sep + s) || dir === s);
 
     try {
       const entries = fs.readdirSync(dir);
@@ -147,7 +156,11 @@ export function scanAgentDirectories(directories: string[]): AgentDefinition[] {
         seen.add(filePath);
 
         const agent = parseAgentFile(filePath);
-        if (agent && !agent.disabled) {
+        if (agent) {
+          agent.disabled = agent.disabled && !isStatic; // static agents cannot be disabled
+          if (isStatic) {
+            staticFiles.add(filePath);
+          }
           agents.push(agent);
         }
       }
@@ -156,12 +169,11 @@ export function scanAgentDirectories(directories: string[]): AgentDefinition[] {
     }
   }
 
-  return agents;
+  return { agents, staticFiles };
 }
 
 /**
  * Collect all existing agent names across the given directories.
- * (Excludes disabled agents.)
  */
 export function collectAgentNames(directories: string[]): Set<string> {
   const names = new Set<string>();
