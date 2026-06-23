@@ -39,7 +39,7 @@ console.log(`Dev version set: ${devVersion}`);
 // --- Run vsce package ---
 let vsceOk = false;
 try {
-  execSync('vsce package', { stdio: 'inherit', cwd: path.join(__dirname, '..') });
+  execSync('npx vsce package', { stdio: 'inherit', cwd: path.join(__dirname, '..') });
   vsceOk = true;
 } catch {
   console.error('\nvsce package failed.');

@@ -5,6 +5,10 @@
   "version": "0.1.0",
   "publisher": "kuozhan",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dongbeiboy/agent.kuozhan.git"
+  },
   "engines": {
     "vscode": "^1.100.0"
   },
