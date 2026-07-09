@@ -1,5 +1,7 @@
 [English Version](./README-en.md)
 
+> ⚠️ 本项目由 AI 辅助开发，**请勿用于生产环境**。
+
 # Custom Agent Loader
 
 一个 VS Code 扩展，让你可以创建和管理自定义 `.agent.md` 文件，作为 `runSubagent` 可调用的聊天代理。
